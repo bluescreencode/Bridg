@@ -90,6 +90,9 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         content.subtitle = event.appLabel
         content.body = event.text
         content.sound = .default
+        if let iconAttachment = makeIconAttachment(iconData: event.largeIcon, notificationId: event.id) {
+            content.attachments = [iconAttachment]
+        }
 
         // Ringing call → Answer/Decline; otherwise reply support if available.
         if event.isCall {
@@ -181,6 +184,22 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private func sendReply(notificationId: String, replyText: String) {
         // This used to build an envelope and then drop it on the floor.
         onReply?(notificationId, notificationId, replyText)
+    }
+
+    private func makeIconAttachment(iconData: Data, notificationId: String) -> UNNotificationAttachment? {
+        guard !iconData.isEmpty else { return nil }
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "BridgNotificationIcons", isDirectory: true
+        )
+        do {
+            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            let fileURL = tempDir.appendingPathComponent("\(UUID().uuidString)-\(notificationId.hashValue).png")
+            try iconData.write(to: fileURL, options: .atomic)
+            return try UNNotificationAttachment(identifier: "app-icon", url: fileURL)
+        } catch {
+            print("Failed to create notification icon attachment: \(error)")
+            return nil
+        }
     }
 
     private func setupDatabase() {
